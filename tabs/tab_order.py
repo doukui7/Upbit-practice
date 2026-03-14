@@ -185,27 +185,51 @@ def render(broker, ticker=None):
             price = 0
 
         _is_stock = is_stock(order_ticker)
-        _qty_label = "주식 수량 (주)" if _is_stock else "주문 수량 (코인)"
 
         if order_side == "매수":
             amount_krw = st.number_input(
                 "주문 금액 (KRW)", min_value=1000, value=5000, step=1000, key="ord_amount_krw"
             )
+            if order_type == "지정가" and price > 0:
+                auto_qty = amount_krw / price
+                st.caption(f"환산 수량: **{auto_qty:.8f}** ({amount_krw:,.0f}원 ÷ {price:,.0f}원)")
         else:
-            try:
-                coin_bal = broker.get_balance(order_ticker)
-            except Exception:
-                coin_bal = 0.0
-            if _is_stock:
-                amount_coin = st.number_input(
-                    _qty_label, min_value=0, value=int(coin_bal or 0),
-                    step=1, key="ord_amount_coin"
+            if order_type == "지정가":
+                # 지정가 매도: 금액 입력 → 수량 자동 환산
+                try:
+                    coin_bal = broker.get_balance(order_ticker)
+                except Exception:
+                    coin_bal = 0.0
+                max_krw = int((coin_bal or 0) * price) if price > 0 else 0
+                sell_krw = st.number_input(
+                    "매도 금액 (KRW)", min_value=1000, value=min(5000, max_krw) if max_krw >= 1000 else 5000,
+                    step=1000, key="ord_sell_krw"
                 )
+                if price > 0:
+                    amount_coin = sell_krw / price
+                    st.caption(
+                        f"환산 수량: **{amount_coin:.8f}** ({sell_krw:,.0f}원 ÷ {price:,.0f}원)"
+                        f" | 보유: {coin_bal:.8f} (≈{max_krw:,.0f}원)"
+                    )
+                else:
+                    amount_coin = 0.0
+                    st.warning("지정가를 입력해주세요.")
             else:
-                amount_coin = st.number_input(
-                    _qty_label, min_value=0.0, value=float(coin_bal or 0),
-                    step=0.0001, format="%.8f", key="ord_amount_coin"
-                )
+                # 시장가 매도: 수량 직접 입력
+                try:
+                    coin_bal = broker.get_balance(order_ticker)
+                except Exception:
+                    coin_bal = 0.0
+                if _is_stock:
+                    amount_coin = st.number_input(
+                        "주문 수량 (주)", min_value=0, value=int(coin_bal or 0),
+                        step=1, key="ord_amount_coin"
+                    )
+                else:
+                    amount_coin = st.number_input(
+                        "주문 수량 (코인)", min_value=0.0, value=float(coin_bal or 0),
+                        step=0.0001, format="%.8f", key="ord_amount_coin"
+                    )
 
         st.divider()
 

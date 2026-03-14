@@ -259,12 +259,20 @@ def render(broker):
         if not orders:
             st.info("등록된 예약 주문이 없습니다.")
         else:
-            for i, o in enumerate(orders):
+            if st.button("🗑 전체 삭제", key="res_clear_all"):
+                st.session_state.reserve_orders = []
+                add_log("[예약주문] 전체 삭제", "INFO")
+                st.rerun(scope="fragment")
+
+            status_icons = {"대기중": "⏳", "완료": "✅", "취소": "❌", "실패": "🔴"}
+
+            for o in orders:
+                oid = o["id"]
                 active_icon = "🟢" if o["active"] else "⚫"
-                status_icon = {"대기중": "⏳", "완료": "✅", "취소": "❌"}.get(o["status"], "")
+                s_icon = status_icons.get(o["status"], "")
                 with st.expander(
-                    f"{active_icon} [{o['id']}] {get_ticker_display(o['ticker'])} {o['side']}"
-                    f" ⏰{o.get('exec_at','?')} — {status_icon} {o['status']}"
+                    f"{active_icon} [{oid}] {get_ticker_display(o['ticker'])} {o['side']}"
+                    f" ⏰{o.get('exec_at','?')} — {s_icon} {o['status']}"
                 ):
                     # 실행 결과 배너
                     result_msg = o.get("result", "")
@@ -277,31 +285,62 @@ def render(broker):
                     with col_i1:
                         st.write(f"- **종목**: {get_ticker_display(o['ticker'])}")
                         st.write(f"- **방향**: {o['side']}")
-                        st.write(f"- **주문 유형**: {o.get('order_type', '시장가')}")
-                        if o.get('order_type') == '지정가' and o.get('limit_price'):
-                            st.write(f"- **지정가**: {float(o['limit_price']):,.0f}원")
+                        order_type_str = o.get('order_type', '시장가')
+                        limit_price = float(o.get('limit_price') or 0)
+                        amount = o['amount']
+                        if order_type_str == '지정가' and limit_price > 0:
+                            st.write(f"- **주문 유형**: 지정가 **{limit_price:,.0f}원**")
+                            if o['side'] == '매수':
+                                qty = float(amount) / limit_price
+                                st.write(f"- **주문 금액**: {float(amount):,.0f}원 → 수량 {qty:.8f}")
+                            else:
+                                total = float(amount) * limit_price
+                                st.write(f"- **주문 수량**: {float(amount):.8f} → 금액 {total:,.0f}원")
+                        else:
+                            st.write(f"- **주문 유형**: 시장가")
+                            if o['side'] == '매수':
+                                st.write(f"- **주문 금액**: {float(amount):,.0f}원")
+                            else:
+                                st.write(f"- **주문 수량**: {float(amount):.8f}")
                         st.write(f"- **전략**: {o['strategy']}")
                     with col_i2:
                         st.write(f"- **실행 시각**: {o.get('exec_at', '—')}")
-                        st.write(f"- **조건**: {o['note']}")
-                        st.write(f"- **수량/금액**: {o['amount']}")
                         st.write(f"- **등록**: {o['created']}")
                         st.write(f"- **상태**: {o['status']}")
+                        st.write(f"- **조건**: {o['note']}")
 
-                    bc1, bc2, bc3 = st.columns(3)
+                    bc1, bc2, bc3, bc4 = st.columns(4)
                     with bc1:
                         toggle_label = "비활성화" if o["active"] else "활성화"
-                        if st.button(toggle_label, key=f"res_tog_{i}"):
-                            st.session_state.reserve_orders[i]["active"] = not o["active"]
-                            add_log(f"[예약주문] #{o['id']} {toggle_label}", "INFO")
+                        if st.button(toggle_label, key=f"res_tog_{oid}"):
+                            for idx, x in enumerate(st.session_state.reserve_orders):
+                                if x["id"] == oid:
+                                    st.session_state.reserve_orders[idx]["active"] = not o["active"]
+                                    break
+                            add_log(f"[예약주문] #{oid} {toggle_label}", "INFO")
                             st.rerun(scope="fragment")
                     with bc2:
-                        if st.button("🗑 삭제", key=f"res_del_{i}"):
-                            del st.session_state.reserve_orders[i]
-                            add_log(f"[예약주문] #{o['id']} 삭제", "INFO")
-                            st.rerun(scope="fragment")
+                        if o["status"] == "대기중":
+                            if st.button("❌ 취소", key=f"res_cancel_{oid}"):
+                                for idx, x in enumerate(st.session_state.reserve_orders):
+                                    if x["id"] == oid:
+                                        st.session_state.reserve_orders[idx]["status"] = "취소"
+                                        st.session_state.reserve_orders[idx]["active"] = False
+                                        break
+                                add_log(f"[예약주문] #{oid} 취소", "INFO")
+                                st.rerun(scope="fragment")
                     with bc3:
-                        if st.button("✅ 완료 처리", key=f"res_done_{i}"):
-                            st.session_state.reserve_orders[i]["status"] = "완료"
-                            add_log(f"[예약주문] #{o['id']} 완료", "ORDER")
+                        if st.button("🗑 삭제", key=f"res_del_{oid}"):
+                            st.session_state.reserve_orders = [
+                                x for x in st.session_state.reserve_orders if x["id"] != oid
+                            ]
+                            add_log(f"[예약주문] #{oid} 삭제", "INFO")
+                            st.rerun(scope="fragment")
+                    with bc4:
+                        if st.button("✅ 완료 처리", key=f"res_done_{oid}"):
+                            for idx, x in enumerate(st.session_state.reserve_orders):
+                                if x["id"] == oid:
+                                    st.session_state.reserve_orders[idx]["status"] = "완료"
+                                    break
+                            add_log(f"[예약주문] #{oid} 완료", "ORDER")
                             st.rerun(scope="fragment")
