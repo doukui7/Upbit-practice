@@ -157,14 +157,20 @@ def render(broker, ticker, ma_period, interval_label="일봉 (1D)"):
                         # 브로커에서 제공하는 평가금액 정보를 쓰면 좋지만 현재 API 구조상 보유량 위주로 구성
                         price = 0.0 
                     
-                    name = get_ticker_display(curr)
-                    unit = "주" if is_stock(curr) else "개"
+                    ticker_key = f"KRW-{curr}"
+                    name = get_ticker_display(ticker_key)
+                    stock = is_stock(ticker_key)
                     eval_amt = amount * price
                     total_eval += eval_amt
-                    
+
+                    if stock:
+                        qty_str = f"{amount:,.0f}주"
+                    else:
+                        qty_str = f"{amount:.8f}"
+
                     rows.append({
                         "자산": name,
-                        "보유량": f"{amount:,.2f}" if not is_stock(curr) else f"{amount:,.0f}{unit}",
+                        "보유량": qty_str,
                         "평가금액": f"{eval_amt:,.0f}원" if price > 0 else "-"
                     })
             

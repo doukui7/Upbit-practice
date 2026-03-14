@@ -46,12 +46,16 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
                 label  = f"✅ 시장가매도 {ticker} {amount:.6f}"
 
         if result is None:
-            msg = f"❌ 주문 거부 (잔고 부족 또는 최소금액 미달)"
-            return False, msg
+            return False, f"❌ 주문 거부 (잔고 부족 또는 최소금액 미달) | {side} {ticker} {order_type}"
+        # API가 에러 dict를 반환한 경우
+        if isinstance(result, dict) and "error" in result:
+            err = result["error"]
+            err_msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+            return False, f"❌ API 오류: {err_msg} | {side} {ticker}"
         uuid = result.get("uuid", "") if isinstance(result, dict) else ""
         return True, f"{label} | uuid={uuid[:8]}" if uuid else label
     except Exception as e:
-        return False, f"❌ 실행 오류: {e}"
+        return False, f"❌ 실행 오류: {type(e).__name__}: {e}"
 
 
 def check_and_execute(broker):
@@ -262,13 +266,23 @@ def render(broker):
                     f"{active_icon} [{o['id']}] {get_ticker_display(o['ticker'])} {o['side']}"
                     f" ⏰{o.get('exec_at','?')} — {status_icon} {o['status']}"
                 ):
+                    # 실행 결과 배너
+                    result_msg = o.get("result", "")
+                    if o["status"] == "실패" and result_msg:
+                        st.error(f"실행 결과: {result_msg}")
+                    elif o["status"] == "완료" and result_msg:
+                        st.success(f"실행 결과: {result_msg}")
+
                     col_i1, col_i2 = st.columns(2)
                     with col_i1:
                         st.write(f"- **종목**: {get_ticker_display(o['ticker'])}")
                         st.write(f"- **방향**: {o['side']}")
+                        st.write(f"- **주문 유형**: {o.get('order_type', '시장가')}")
+                        if o.get('order_type') == '지정가' and o.get('limit_price'):
+                            st.write(f"- **지정가**: {float(o['limit_price']):,.0f}원")
                         st.write(f"- **전략**: {o['strategy']}")
-                        st.write(f"- **실행 시각**: {o.get('exec_at', '—')}")
                     with col_i2:
+                        st.write(f"- **실행 시각**: {o.get('exec_at', '—')}")
                         st.write(f"- **조건**: {o['note']}")
                         st.write(f"- **수량/금액**: {o['amount']}")
                         st.write(f"- **등록**: {o['created']}")
