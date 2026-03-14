@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime, date, time, timedelta
 from streamlit_autorefresh import st_autorefresh
 from tabs.tab_log import add_log
-from utils import get_ticker_display, is_stock
+from utils import get_ticker_display, is_stock, round_price_upbit
 
 TICKERS = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-SOL", "KRW-ADA", "KRW-DOGE"]
 STRATEGIES = ["시간 지정 실행", "목표가 돌파 시 매수", "이평선 상향 돌파 시 매수", "리밸런싱 (비율)"]
@@ -25,7 +25,8 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
     ticker      = order["ticker"]
     side        = order["side"]
     order_type  = order.get("order_type", "시장가")
-    limit_price = float(order.get("limit_price") or 0)
+    limit_price_raw = float(order.get("limit_price") or 0)
+    limit_price = round_price_upbit(limit_price_raw) if limit_price_raw > 0 else 0
     amount      = float(order["amount"])
     try:
         result = None

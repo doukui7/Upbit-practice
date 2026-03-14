@@ -84,3 +84,40 @@ def get_krw_balance(upbit):
 def format_price(price):
     """Format price with comma separator."""
     return f"{price:,.0f}"
+
+
+def round_price_upbit(price: float) -> int:
+    """업비트 호가 단위에 맞춰 가격 반올림.
+    https://docs.upbit.com/docs/market-info-trade-price-detail
+    """
+    p = float(price)
+    if p >= 2_000_000:
+        tick = 1_000
+    elif p >= 1_000_000:
+        tick = 500
+    elif p >= 500_000:
+        tick = 100
+    elif p >= 100_000:
+        tick = 50
+    elif p >= 10_000:
+        tick = 10
+    elif p >= 1_000:
+        tick = 5
+    elif p >= 100:
+        tick = 1
+    elif p >= 10:
+        tick = 0.1
+    else:
+        tick = 0.01
+    # 가격대별 세분화 (고가 코인용)
+    if p >= 500_000_000:
+        tick = 1_000_000
+    elif p >= 100_000_000:
+        tick = 100_000
+    elif p >= 50_000_000:
+        tick = 50_000
+    elif p >= 10_000_000:
+        tick = 10_000
+    elif p >= 5_000_000:
+        tick = 5_000
+    return int(round(p / tick) * tick)

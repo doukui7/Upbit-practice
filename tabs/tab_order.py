@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
 from tabs.tab_log import add_log
-from utils import get_ticker_display, is_stock
+from utils import get_ticker_display, is_stock, round_price_upbit
 
 TICKERS = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-SOL", "KRW-ADA", "KRW-DOGE"]
 
@@ -226,24 +226,25 @@ def render(broker, ticker=None):
         if st.button("🚀 주문 실행", type="primary", key="ord_submit", disabled=not confirmed):
             try:
                 result = None
+                # 지정가 호가 단위 보정
+                adj_price = round_price_upbit(price) if order_type == "지정가" and price > 0 else price
                 if order_side == "매수":
                     if order_type == "시장가":
                         result = broker.buy_market_order(order_ticker, amount_krw)
                         label = f"시장가매수 {order_ticker} {amount_krw:,}원"
                     else:
-                        qty = amount_krw / price if price > 0 else 0
-                        # 주식인 경우 수량이 정수여야 하지만, Broker에서 알아서 처리하도록 하거나 여기서 int 캐스팅
+                        qty = amount_krw / adj_price if adj_price > 0 else 0
                         if not order_ticker.startswith("KRW-"):
                             qty = int(qty)
-                        result = broker.buy_limit_order(order_ticker, price, qty)
-                        label = f"지정가매수 {order_ticker} {price:,}원 × {qty:.6f}"
+                        result = broker.buy_limit_order(order_ticker, adj_price, qty)
+                        label = f"지정가매수 {order_ticker} {adj_price:,}원 × {qty:.6f}"
                 else:
                     if order_type == "시장가":
                         result = broker.sell_market_order(order_ticker, amount_coin)
                         label = f"시장가매도 {order_ticker} {amount_coin:.8f}"
                     else:
-                        result = broker.sell_limit_order(order_ticker, price, amount_coin)
-                        label = f"지정가매도 {order_ticker} {price:,}원 × {amount_coin:.8f}"
+                        result = broker.sell_limit_order(order_ticker, adj_price, amount_coin)
+                        label = f"지정가매도 {order_ticker} {adj_price:,}원 × {amount_coin:.8f}"
 
                 if result is None:
                     msg = f"주문 거부됨 — 잔고 부족 또는 최소금액 미달 ({label})"
