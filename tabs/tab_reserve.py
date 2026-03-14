@@ -182,6 +182,9 @@ def render(broker):
                 res_amount = st.number_input(
                     "주문 금액 (KRW)", min_value=5000, value=50000, step=1000, key="res_amount"
                 )
+                if res_order_type == "지정가" and res_limit_price > 0:
+                    auto_qty = res_amount / res_limit_price
+                    st.caption(f"환산 수량: **{auto_qty:.8f}** ({res_amount:,.0f}원 ÷ {res_limit_price:,.0f}원)")
             else:
                 if _is_stock:
                     res_amount = st.number_input(
@@ -193,6 +196,9 @@ def render(broker):
                         "주문 수량 (코인)", min_value=0.0, value=0.001,
                         step=0.0001, format="%.8f", key="res_amount_coin"
                     )
+                if res_order_type == "지정가" and res_limit_price > 0:
+                    total_krw = float(res_amount) * res_limit_price
+                    st.caption(f"환산 금액: **{total_krw:,.0f}원** ({float(res_amount):.8f} × {res_limit_price:,.0f}원)")
 
         with c2:
             # ── 전략별 조건 입력 ────────────────────────────────────
