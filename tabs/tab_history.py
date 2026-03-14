@@ -14,7 +14,7 @@ def _fetch_orders(broker, ticker, state="done", count=50):
     """Fetch orders with given state: done / cancel / wait."""
     try:
         result = broker.get_order(ticker, state=state)
-        return result if result else []
+        return result if isinstance(result, list) else []
     except Exception as e:
         add_log(f"[거래내역 오류] {e}", "ERROR")
         return []

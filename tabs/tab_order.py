@@ -23,7 +23,7 @@ def _get_all_pending_orders(broker):
     for t in active_tickers:
         try:
             orders = broker.get_order(t, state="wait")
-            if orders:
+            if isinstance(orders, list):
                 all_orders.extend(orders)
         except Exception:
             pass
