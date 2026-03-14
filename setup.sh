@@ -32,7 +32,7 @@ After=network.target
 [Service]
 User=$USER_NAME
 WorkingDirectory=$WORKING_DIR
-ExecStart=$WORKING_DIR/venv/bin/streamlit run main.py --server.port 8501 --server.address 0.0.0.0
+ExecStart=$WORKING_DIR/venv/bin/streamlit run app.py --server.port 8501 --server.address 0.0.0.0
 Restart=always
 
 [Install]
