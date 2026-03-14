@@ -54,14 +54,14 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
         return False, f"❌ 실행 오류: {e}"
 
 
-def _check_and_execute(broker):
+def check_and_execute(broker):
     """
     Scan all active 'wait' orders whose exec_at <= now and execute them.
-    Only handles '\uc2dc\uac04 \uc9c0\uc815 \uc2e4\ud589' strategy for now.
-    Condition-based strategies (\ub9e4\uc218/\uc774\ud3c9\uc120/\ub9ac\ubc38\ub7f0\uc2f1) require separate price-check logic.
+    Called from app.py on every rerun (not just when reserve tab is visible).
+    Only handles '시간 지정 실행' strategy for now.
     """
     if "reserve_orders" not in st.session_state:
-        return
+        return False
     now = datetime.now()
     changed = False
     for i, order in enumerate(st.session_state.reserve_orders):
@@ -77,6 +77,7 @@ def _check_and_execute(broker):
         # Fire if execution time has arrived
         if now >= exec_dt:
             strategy = order.get("strategy", "")
+            add_log(f"[예약체크] #{order['id']} 시간 도래 (예약: {exec_at_str}, 현재: {now.strftime('%H:%M:%S')}, 전략: {strategy})", "INFO")
             if strategy == "시간 지정 실행":
                 success, msg = _execute_order(broker, order)
                 st.session_state.reserve_orders[i]["status"] = "완료" if success else "실패"
@@ -84,7 +85,8 @@ def _check_and_execute(broker):
                 level = "ORDER" if success else "ERROR"
                 add_log(f"[예약실행] #{order['id']} {msg}", level)
                 changed = True
-            # TODO: condition-based strategies (price/MA check) to be added
+            else:
+                add_log(f"[예약체크] #{order['id']} 전략 '{strategy}'은(는) 아직 미구현", "WARNING")
     return changed
 
 
@@ -126,12 +128,8 @@ def _datetime_picker(key_prefix: str):
 def render(broker):
     _init()
     
-    # 30초마다 자동 갱신하여 시간이 된 주문이 있는지 체크
+    # 30초마다 자동 갱신
     st_autorefresh(interval=30_000, key="reserve_autorefresh")
-    
-    # 시간에 도달한 주문 실행
-    if _check_and_execute(broker):
-        st.rerun(scope="fragment")
 
     st.subheader("📅 예약 주문")
     st.caption("시간 또는 전략 조건에 따라 자동으로 실행될 주문을 예약합니다.")

@@ -187,6 +187,11 @@ t1, t2, t3, t4, t5, t6, t7 = st.tabs([
 # 전역 설정에서 선택된 브로커를 탭으로 넘겨줍니다.
 broker = st.session_state.broker
 
+# ── 예약 주문 체크 (매 rerun마다 실행 — 어느 탭에 있든 작동) ──────────
+from tabs.tab_reserve import check_and_execute as _reserve_check
+if _reserve_check(broker):
+    st.rerun()
+
 @st.fragment
 def fragment_monitor():
     tab_monitor.render(broker, ticker, ma_period, interval_label)
