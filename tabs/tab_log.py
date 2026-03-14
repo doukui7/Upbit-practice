@@ -37,7 +37,7 @@ def render():
     with col2:
         level_filter = st.selectbox(
             "레벨 필터",
-            ["전체", "INFO", "WARNING", "ERROR", "ORDER"],
+            ["전체", "INFO", "WARNING", "ERROR", "ORDER", "DEBUG"],
         )
 
     # Action buttons
@@ -76,10 +76,14 @@ def render():
 
     st.divider()
 
-    # Display logs (newest first)
+    # Display logs (newest first), hide DEBUG by default
     logs = list(reversed(st.session_state.logs))
 
-    if level_filter != "전체":
+    if level_filter == "전체":
+        logs = [l for l in logs if l["level"] != "DEBUG"]
+    elif level_filter == "DEBUG":
+        logs = [l for l in logs if l["level"] == "DEBUG"]
+    else:
         logs = [l for l in logs if l["level"] == level_filter]
     if keyword:
         logs = [l for l in logs if keyword.lower() in l["message"].lower()]

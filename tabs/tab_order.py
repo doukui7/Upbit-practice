@@ -39,28 +39,16 @@ def _render_orderbook_html(ob_data):
     total_ask_size = ob_data.get("total_ask_size", 0)
     total_bid_size = ob_data.get("total_bid_size", 0)
 
-    # 화면에 다 들어오도록 전체 레이아웃 압축 CSS 주입
+    # 호가창 전용 CSS (iframe 안이므로 다른 탭에 영향 없음)
     st.markdown("""
         <style>
-        /* 일반 버튼(호가, 취소 등)의 상하 크기 최소화 */
-        div.stButton > button[kind="secondary"] {
+        /* 호가창 영역 내부만 축소 */
+        [data-testid="stExpander"] div.stButton > button[kind="secondary"],
+        .orderbook-area div.stButton > button[kind="secondary"] {
             min-height: 22px !important;
             height: 24px !important;
             padding: 0px 4px !important;
             font-size: 13px !important;
-        }
-        /* 마크다운 텍스트 여백 축소 */
-        .stMarkdown p {
-            margin-bottom: 0px !important;
-            font-size: 13px !important;
-        }
-        /* 위아래 행 간격 극소화 */
-        div[data-testid="stVerticalBlock"] {
-            gap: 0.1rem !important;
-        }
-        div[data-testid="stHorizontalBlock"] {
-            gap: 0.1rem !important;
-            align-items: center !important;
         }
         </style>
     """, unsafe_allow_html=True)
