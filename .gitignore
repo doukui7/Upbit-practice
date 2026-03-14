@@ -1,0 +1,27 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Secrets and Keys
+.env
+*.txt
+*.dat
+mcp_tools_full.json
+
+# IDE / Editor
+.vscode/
+.idea/
+.gemini/
+
+# Node modules (if any)
+node_modules/
+
+# OS Files
+Thumbs.db
+Desktop.ini
