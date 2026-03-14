@@ -124,6 +124,9 @@ def render(broker, ticker=None):
     st.markdown("#### 💼 현재 잔고")
     try:
         balances = broker.get_balances()
+        if not isinstance(balances, list):
+            st.warning(f"잔고 데이터 오류: {balances}")
+            balances = []
         rows = []
         for b in balances:
             bal = float(b.get("balance", 0) or 0)

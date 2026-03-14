@@ -134,9 +134,12 @@ def render(broker, ticker, ma_period, interval_label="일봉 (1D)"):
         st.markdown("#### 💰 잔고 현황 (전체)")
         try:
             balances = broker.get_balances()
+            if not isinstance(balances, list):
+                st.warning(f"잔고 데이터 오류: {balances}")
+                balances = []
             rows = []
             total_eval = 0.0
-            
+
             for b in balances:
                 curr = b['currency']
                 amount = float(b['balance'])
