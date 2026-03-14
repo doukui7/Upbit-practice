@@ -165,10 +165,13 @@ def render(broker, ticker=None):
 
         if order_type == "지정가":
             if "ord_price" not in st.session_state:
-                st.session_state.ord_price = int(curr_price * 0.98) if curr_price else 100000
+                st.session_state.ord_price = int(round_price_upbit(curr_price * 0.98)) if curr_price else 100000
 
-            price = st.number_input("주문 가격 (KRW)", min_value=1,
-                                    step=1000, key="ord_price")
+            price_raw = st.number_input("주문 가격 (KRW)", min_value=1,
+                                        step=1000, key="ord_price")
+            price = int(round_price_upbit(price_raw)) if price_raw > 0 else 0
+            if price != price_raw:
+                st.caption(f"호가 단위 보정: {price_raw:,.0f}원 → **{price:,.0f}원**")
         else:
             price = 0
 

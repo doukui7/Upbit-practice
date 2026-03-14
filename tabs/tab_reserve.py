@@ -168,14 +168,18 @@ def render(broker):
                     curr = broker.get_current_price(res_ticker) or 0
                 except Exception:
                     curr = 0
-                res_limit_price = st.number_input(
+                default_price = int(round_price_upbit(curr * 0.98)) if curr else 100_000
+                res_limit_price_raw = st.number_input(
                     "지정 가격 (KRW)" if _is_stock else "지정 가격 (KRW/코인)",
                     min_value=1,
-                    value=int(curr * 0.98) if curr else 100_000,
+                    value=default_price,
                     step=1000,
                     key="res_limit_price",
                     help="지정가 매수: 현재가보다 낮게 / 매도: 현재가보다 높게 설정",
                 )
+                res_limit_price = int(round_price_upbit(res_limit_price_raw)) if res_limit_price_raw > 0 else 0
+                if res_limit_price != res_limit_price_raw:
+                    st.caption(f"호가 단위 보정: {res_limit_price_raw:,.0f}원 → **{res_limit_price:,.0f}원**")
                 if curr:
                     st.caption(f"현재가: {curr:,.0f}원 | 설정가: {res_limit_price:,.0f}원 ({(res_limit_price/curr-1)*100:+.2f}%)")
             else:
