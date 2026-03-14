@@ -45,6 +45,9 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
                 result = broker.sell_market_order(ticker, amount)
                 label  = f"✅ 시장가매도 {ticker} {amount:.6f}"
 
+        # 전체 API 응답 로깅
+        add_log(f"[예약주문 API응답] {side} {ticker}: {result}", "INFO")
+
         if result is None:
             return False, f"❌ 주문 거부 (잔고 부족 또는 최소금액 미달) | {side} {ticker} {order_type}"
         # API가 에러 dict를 반환한 경우
@@ -53,7 +56,7 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
             err_msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
             return False, f"❌ API 오류: {err_msg} | {side} {ticker}"
         uuid = result.get("uuid", "") if isinstance(result, dict) else ""
-        return True, f"{label} | uuid={uuid[:8]}" if uuid else label
+        return True, f"{label} | uuid={uuid}" if uuid else label
     except Exception as e:
         return False, f"❌ 실행 오류: {type(e).__name__}: {e}"
 
