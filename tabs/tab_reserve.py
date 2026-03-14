@@ -27,6 +27,8 @@ def _execute_order(broker, order: dict) -> tuple[bool, str]:
     order_type  = order.get("order_type", "시장가")
     limit_price_raw = float(order.get("limit_price") or 0)
     limit_price = round_price_upbit(limit_price_raw) if limit_price_raw > 0 else 0
+    if limit_price_raw > 0 and limit_price != limit_price_raw:
+        add_log(f"[호가보정] {ticker} 가격 {limit_price_raw:,.0f}원 → {limit_price:,.0f}원 (호가 단위 자동 보정)", "INFO")
     amount      = float(order["amount"])
     try:
         result = None

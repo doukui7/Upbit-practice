@@ -228,6 +228,9 @@ def render(broker, ticker=None):
                 result = None
                 # 지정가 호가 단위 보정
                 adj_price = round_price_upbit(price) if order_type == "지정가" and price > 0 else price
+                if order_type == "지정가" and price > 0 and adj_price != price:
+                    add_log(f"[호가보정] {order_ticker} 가격 {price:,.0f}원 → {adj_price:,.0f}원 (호가 단위 자동 보정)", "INFO")
+                    st.info(f"호가 단위 보정: {price:,.0f}원 → **{adj_price:,.0f}원**")
                 if order_side == "매수":
                     if order_type == "시장가":
                         result = broker.buy_market_order(order_ticker, amount_krw)
