@@ -131,6 +131,10 @@ def render(broker):
     # 30초마다 자동 갱신
     st_autorefresh(interval=30_000, key="reserve_autorefresh")
 
+    # 시간에 도달한 예약 주문 실행 (fragment rerun에서도 동작)
+    if check_and_execute(broker):
+        st.rerun(scope="fragment")
+
     st.subheader("📅 예약 주문")
     st.caption("시간 또는 전략 조건에 따라 자동으로 실행될 주문을 예약합니다.")
 
