@@ -10,7 +10,6 @@ __pycache__/
 
 # Secrets and Keys
 .env
-*.txt
 *.dat
 mcp_tools_full.json
 

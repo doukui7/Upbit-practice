@@ -2,6 +2,7 @@
 Tab: Log
 All trading activity logs stored in session_state.
 """
+import os
 import streamlit as st
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
@@ -39,10 +40,39 @@ def render():
             ["전체", "INFO", "WARNING", "ERROR", "ORDER"],
         )
 
-    # Clear button
-    if st.button("🗑 로그 초기화", type="secondary"):
-        st.session_state.logs = []
-        st.rerun()
+    # Action buttons
+    btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
+
+    with btn_col1:
+        if st.button("🗑 로그 초기화", type="secondary"):
+            st.session_state.logs = []
+            st.rerun()
+
+    # 세션 로그 다운로드
+    with btn_col2:
+        log_text = "\n".join(
+            f"[{e['time']}] [{e['level']}] {e['message']}"
+            for e in st.session_state.logs
+        )
+        st.download_button(
+            "📥 세션 로그 다운로드",
+            data=log_text,
+            file_name=f"session_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+            mime="text/plain",
+        )
+
+    # trade.log 파일 다운로드
+    with btn_col3:
+        trade_log_path = "trade.log"
+        if os.path.exists(trade_log_path):
+            with open(trade_log_path, "r", encoding="utf-8") as f:
+                trade_log_content = f.read()
+            st.download_button(
+                "📥 trade.log 다운로드",
+                data=trade_log_content,
+                file_name=f"trade_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain",
+            )
 
     st.divider()
 

@@ -1,0 +1,9 @@
+pyupbit==0.2.34
+streamlit==1.54.0
+streamlit-autorefresh==1.0.1
+pandas==2.3.3
+plotly==6.6.0
+python-dotenv==1.2.2
+requests==2.32.5
+websocket-client==1.9.0
+PyJWT==2.11.0

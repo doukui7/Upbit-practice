@@ -8,23 +8,23 @@ import pandas as pd
 
 class BrokerKIS:
     def __init__(self, app_key, app_secret, account_number, mock=False):
-        self.app_key = app_key
-        self.app_secret = app_secret
-        self.account_number = account_number
+        self.app_key = app_key or ""
+        self.app_secret = app_secret or ""
+        self.account_number = account_number or ""
         self.mock = mock
         self.name = "한국투자증권(모의)" if mock else "한국투자증권(실전)"
-        
+
         self.base_url = "https://openapivts.koreainvestment.com:29443" if mock else "https://openapi.koreainvestment.com:9443"
         self.access_token = ""
         self.token_expired_at = 0
         self._token_last_attempt = 0  # 토큰 발급 시도 시각 (1분 제한 방지)
-        
+
         # 계좌번호 포맷 강제 ('-01'이 없으면 추가)
-        if "-" not in self.account_number:
+        if self.account_number and "-" not in self.account_number:
             self.account_number += "-01"
-            
-        self._acc_no_prefix = self.account_number.split("-")[0]
-        self._acc_no_postfix = self.account_number.split("-")[1]
+
+        self._acc_no_prefix = self.account_number.split("-")[0] if self.account_number else ""
+        self._acc_no_postfix = self.account_number.split("-")[1] if "-" in self.account_number else "01"
         
     def _get_token(self):
         now = time.time()

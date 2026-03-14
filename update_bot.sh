@@ -1,22 +1,20 @@
 #!/bin/bash
-# 1. 이동
-cd /home/doukui7/upbit-bot
+WORKDIR="$(dirname "$(readlink -f "$0")")"
+cd "$WORKDIR"
 
-# 2. 깃허브에서 원격 정보를 가져옴 (실제로 받지는 않음)
 git fetch origin main
 
-# 3. 로컬 버전과 원격 버전 비교
 LOCAL=$(git rev-parse @)
 REMOTE=$(git rev-parse @{u})
 
-if [ $LOCAL != $REMOTE ]; then
+if [ "$LOCAL" != "$REMOTE" ]; then
     echo "[$(date)] New changes detected! Updating..."
-    # 4. 코드 내려받기
+    # 로컬 변경사항 stash (setup.sh 등 충돌 방지)
+    git stash --include-untracked
     git pull origin main
-    # 5. 서비스 재시작
+    # 서비스 재시작
     sudo systemctl restart upbit-bot
-    echo "Update complete and service restarted."
+    echo "[$(date)] Update complete and service restarted."
 else
-    # echo "[$(date)] No changes."
     exit 0
 fi

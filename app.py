@@ -34,13 +34,22 @@ kis_mock_app_key = os.getenv("KIS_MOCK_APP_KEY")
 kis_mock_app_secret = os.getenv("KIS_MOCK_APP_SECRET")
 kis_mock_account = os.getenv("KIS_MOCK_ACCOUNT")
 
-# 브로커 객체 초기화
+# 브로커 객체 초기화 (키가 없어도 크래시하지 않도록 보호)
 if "broker_upbit" not in st.session_state:
-    st.session_state.broker_upbit = BrokerUpbit(upbit_access, upbit_secret)
+    try:
+        st.session_state.broker_upbit = BrokerUpbit(upbit_access, upbit_secret)
+    except Exception as e:
+        st.session_state.broker_upbit = None
 if "broker_kis_real" not in st.session_state:
-    st.session_state.broker_kis_real = BrokerKIS(kis_real_app_key, kis_real_app_secret, kis_real_account, mock=False)
+    try:
+        st.session_state.broker_kis_real = BrokerKIS(kis_real_app_key, kis_real_app_secret, kis_real_account, mock=False)
+    except Exception as e:
+        st.session_state.broker_kis_real = None
 if "broker_kis_mock" not in st.session_state:
-    st.session_state.broker_kis_mock = BrokerKIS(kis_mock_app_key, kis_mock_app_secret, kis_mock_account, mock=True)
+    try:
+        st.session_state.broker_kis_mock = BrokerKIS(kis_mock_app_key, kis_mock_app_secret, kis_mock_account, mock=True)
+    except Exception as e:
+        st.session_state.broker_kis_mock = None
 
 # ── 페이지 설정 ─────────────────────────────────────────────────────────
 st.set_page_config(page_title="Auto-Bot Dashboard", layout="wide")
@@ -92,9 +101,10 @@ st.sidebar.divider()
 
 # ── 연결 상태 확인 (토큰/잔고 확인, 중복 토큰 발급 방지) ──────────
 def _check_connection(broker):
+    if broker is None:
+        return False, "브로커 초기화 실패 — .env 파일의 API 키를 확인하세요"
     try:
         if hasattr(broker, '_get_token'):
-            # KIS: 기존 토큰 사용 or 최초 발급 (broker 내부에서 1분 제한 관리)
             token = broker._get_token()
             if token:
                 return True, "연결 성공 (토큰 유효)"
@@ -144,10 +154,17 @@ with st.sidebar.expander("📋 최근 실행 로그 (trade.log)", expanded=False
         if os.path.exists("trade.log"):
             with open("trade.log", "r", encoding="utf-8") as f:
                 all_lines = f.readlines()
-                # 린트 대응을 위해 명시적으로 슬라이싱
                 start_idx = max(0, len(all_lines) - 15)
                 recent_lines = all_lines[start_idx:]
                 st.text("".join(recent_lines))
+            with open("trade.log", "r", encoding="utf-8") as f:
+                st.sidebar.download_button(
+                    "📥 trade.log 다운로드",
+                    data=f.read(),
+                    file_name="trade.log",
+                    mime="text/plain",
+                    key="sidebar_trade_log_dl",
+                )
         else:
             st.info("로그 파일이 아직 생성되지 않았습니다.")
     except Exception as e:
