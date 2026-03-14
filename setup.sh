@@ -43,9 +43,46 @@ EOF
 echo "Enabling and starting service..."
 sudo systemctl daemon-reload
 sudo systemctl enable upbit-bot
+sudo systemctl start upbit-bot
+
+# 7. Register Auto-Update Service & Timer (Checks every 1 minute)
+echo "Registering auto-updater service and timer..."
+UPDATE_SERVICE="/etc/systemd/system/upbit-update.service"
+UPDATE_TIMER="/etc/systemd/system/upbit-update.timer"
+
+sudo bash -c "cat > $UPDATE_SERVICE" <<EOF
+[Unit]
+Description=Upbit Bot Auto-Updater
+After=network.target
+
+[Service]
+Type=oneshot
+User=$USER_NAME
+WorkingDirectory=$WORKING_DIR
+ExecStart=/bin/bash $WORKING_DIR/update_bot.sh
+EOF
+
+sudo bash -c "cat > $UPDATE_TIMER" <<EOF
+[Unit]
+Description=Run Upbit Bot Auto-Updater every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=upbit-update.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable upbit-update.timer
+sudo systemctl start upbit-update.timer
 
 echo "------------------------------------------------"
-echo "Setup Complete!"
-echo "You can check status using: sudo systemctl status upbit-bot"
-echo "Your dashboard will be at: http://YOUR_VM_IP:8501"
+echo "Setup & Auto-Updater Enabled!"
+echo "The bot will automatically update every minute when you push to GitHub."
+echo "Check bot status: sudo systemctl status upbit-bot"
+echo "Check updater info: sudo systemctl status upbit-update.timer"
+echo "Your dashboard: http://YOUR_VM_IP:8501"
 echo "------------------------------------------------"
