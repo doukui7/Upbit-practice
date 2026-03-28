@@ -299,13 +299,26 @@ def schedule_cancel(order_id: int = Query(...), x_api_key: str = Header(default=
 
 from cache_utils import (
     save_balance_cache, save_signal_state, save_scheduler_state,
-    append_trade_log, push_all_cache, CACHE_FILES,
+    append_trade_log, append_execution_log, push_all_cache, CACHE_FILES,
+    record_scheduler_error, record_scheduler_success,
 )
 
 GH_PAT = os.getenv("GH_PAT", "")
 BALANCE_SYNC_INTERVAL = 30
 GITHUB_PUSH_INTERVAL = 300
-_scheduler_state = {"started_at": datetime.now().isoformat(), "errors": []}
+
+try:
+    from zoneinfo import ZoneInfo
+    _KST = ZoneInfo("Asia/Seoul")
+except Exception:
+    _KST = None
+
+def _now_kst():
+    if _KST:
+        return datetime.now(_KST)
+    return datetime.now()
+
+_scheduler_state = {"__started_at_kst": _now_kst().strftime("%Y-%m-%d %H:%M:%S")}
 
 
 def _sync_balance():
@@ -338,6 +351,7 @@ def _sync_balance():
             })
     except Exception as e:
         logger.error(f"Balance sync error: {e}")
+        record_scheduler_error(_scheduler_state, "balance_sync", e)
 
 
 def _push_to_github():
@@ -386,6 +400,10 @@ def _scheduler_loop():
                             order["result"] = "broker not found"
                             continue
 
+                        # 호가 단위 보정
+                        if order["order_type"] == "limit" and order.get("price", 0) > 0:
+                            order["price"] = round_price_upbit(order["price"])
+
                         result = None
                         if order["side"] == "buy" and order["order_type"] == "market":
                             result = b.buy_market_order(order["ticker"], order["price"])
@@ -408,11 +426,13 @@ def _scheduler_loop():
                             "side": order["side"],
                             "result": str(result),
                         })
+                        record_scheduler_success(_scheduler_state, "schedule")
 
                 except Exception as e:
                     order["status"] = "error"
                     order["result"] = str(e)
                     logger.error(f"Schedule error: #{order['id']} {e}")
+                    record_scheduler_error(_scheduler_state, "schedule", e)
 
         _time.sleep(10)
 
