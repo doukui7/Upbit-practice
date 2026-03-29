@@ -201,6 +201,78 @@ def update_feature_status(feature_id: str, new_status: str, note: str = ""):
     add_log(f"[상태변경] {feature_id}: {old_status} → {new_status} {note}", "INFO")
 
 
+def _render_vm_status():
+    """VM 스케줄러 상태 + 전략 신호 표시 (cache JSON 기반)."""
+    from cache_utils import load_scheduler_state, load_signal_state, load_execution_log
+    import time as _time
+
+    st.subheader("VM 스케줄러 상태")
+    sched = load_scheduler_state()
+    if not sched:
+        st.warning("스케줄러 상태 정보 없음 (cache/scheduler_state.json)")
+        return
+
+    hb = sched.get("__heartbeat_kst", sched.get("__heartbeat", "-"))
+    epoch = float(sched.get("__heartbeat_epoch", 0))
+    elapsed = int(_time.time() - epoch) if epoch > 0 else -1
+    started = sched.get("__started_at_kst", "-")
+    fails = sched.get("__consecutive_failures", "0")
+    last_err = sched.get("__last_error", "-")
+    last_trade = sched.get("__last_trade_kst", "-")
+    last_mode = sched.get("__last_trade_mode", "-")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("하트비트", hb, f"{elapsed}초 전" if elapsed >= 0 else "")
+    col2.metric("시작 시각", started)
+    col3.metric("연속 실패", fails, "정상" if fails == "0" else "주의")
+
+    col4, col5 = st.columns(2)
+    col4.metric("마지막 매매", last_trade)
+    col5.metric("마지막 모드", last_mode)
+
+    if last_err != "-":
+        st.error(f"마지막 에러: {last_err}")
+
+    # 전략 신호 상태
+    st.subheader("전략 신호 상태")
+    signals = load_signal_state()
+    if signals:
+        rows = []
+        for key, val in signals.items():
+            if isinstance(val, dict):
+                rows.append({
+                    "전략": val.get("label", key),
+                    "상태": val.get("state", "-"),
+                    "가격": f"{val.get('price', 0):,.0f}",
+                    "갱신": val.get("updated_at", "-"),
+                })
+            else:
+                rows.append({"전략": key, "상태": str(val), "가격": "-", "갱신": "-"})
+        st.dataframe(rows, use_container_width=True)
+    else:
+        st.info("전략 신호 데이터 없음")
+
+    # 최근 실행 기록
+    st.subheader("최근 실행 기록")
+    logs = load_execution_log(limit=10)
+    if logs:
+        for entry in reversed(logs):
+            action = entry.get("action", "")
+            logged = entry.get("logged_at", "")
+            if action == "strategy_run":
+                sells = entry.get("sells", 0)
+                buys = entry.get("buys", 0)
+                st.caption(f"`{logged}` 전략실행 | 매도 {sells}건, 매수 {buys}건")
+            elif action == "skip":
+                st.caption(f"`{logged}` {entry.get('ticker', '')} 스킵: {entry.get('reason', '')}")
+            elif action == "error":
+                st.caption(f"`{logged}` {entry.get('ticker', '')} 에러: {entry.get('error', '')[:100]}")
+            else:
+                st.caption(f"`{logged}` {action}")
+    else:
+        st.info("실행 기록 없음")
+
+
 def render():
     _init_state()
     broker_key = _get_broker_key()
@@ -208,13 +280,17 @@ def render():
     broker_label = _labels.get(broker_key, broker_key)
     sk = _state_key
 
-    st.subheader("📌 작업 현황 대시보드")
+    st.subheader("작업 현황 대시보드")
     st.caption(f"현재 거래소: **{broker_label}** — 수정 내역은 거래소별로 별도 관리됩니다.")
 
-    subtab1, subtab2 = st.tabs(["📋 기능별 상태", f"🗂 수정 내역 ({broker_label})"])
+    subtab1, subtab2, subtab3 = st.tabs(["VM 상태", "기능별 상태", f"수정 내역 ({broker_label})"])
 
-    # ── Sub-tab 1: Feature checklist ──────────────────────────────────
+    # ── Sub-tab 0: VM Status ──
     with subtab1:
+        _render_vm_status()
+
+    # ── Sub-tab 1: Feature checklist ──
+    with subtab2:
         st.caption("각 기능의 현재 상태를 확인하고 직접 상태를 변경할 수 있습니다.")
 
         cols_header = st.columns([0.4, 2, 3, 2, 1.5])
@@ -262,8 +338,8 @@ def render():
             else:
                 st.info("변경할 항목이 없습니다.")
 
-    # ── Sub-tab 2: Revision history (브로커별) ─────────────────────────
-    with subtab2:
+    # ── Sub-tab 2: Revision history ──
+    with subtab3:
         st.subheader(f"🗂 수정 내역 — {broker_label}")
         history = list(reversed(st.session_state[sk("revision_history")]))
         if not history:
