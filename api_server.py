@@ -28,7 +28,6 @@ from broker_kis import BrokerKIS
 API_KEY = os.getenv("VM_API_KEY", "")
 _brokers = {}
 
-
 def _init_brokers():
     access = os.getenv("UPBIT_ACCESS_KEY")
     secret = os.getenv("UPBIT_SECRET_KEY")
@@ -53,13 +52,11 @@ def _init_brokers():
             except Exception as e:
                 logger.error(f"KIS {key} init failed: {e}")
 
-
 _init_brokers()
 
 # ── FastAPI 앱 ─────────────────────────────────────────────────────────
 app = FastAPI(title="Trading API Server")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
 
 def _get_broker(broker_key: str):
     b = _brokers.get(broker_key)
@@ -67,17 +64,14 @@ def _get_broker(broker_key: str):
         raise HTTPException(404, f"Broker '{broker_key}' not found. Available: {list(_brokers.keys())}")
     return b
 
-
 def _check_auth(x_api_key: str = Header(default="")):
     if API_KEY and x_api_key != API_KEY:
         raise HTTPException(401, "Invalid API key")
-
 
 # ── 헬스체크 ──────────────────────────────────────────────────────────
 @app.get("/api/health")
 def health():
     return {"status": "ok", "brokers": list(_brokers.keys()), "time": datetime.now().isoformat()}
-
 
 # ── 브로커 정보 ───────────────────────────────────────────────────────
 @app.get("/api/broker_info")
@@ -86,26 +80,22 @@ def broker_info(broker: str = Query(...), x_api_key: str = Header(default="")):
     b = _get_broker(broker)
     return {"name": b.name, "account_number": getattr(b, "account_number", "")}
 
-
 # ── 잔고 ─────────────────────────────────────────────────────────────
 @app.get("/api/balances")
 def get_balances(broker: str = Query(...), x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return _get_broker(broker).get_balances()
 
-
 @app.get("/api/balance")
 def get_balance(broker: str = Query(...), ticker: str = Query(...), x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return {"balance": _get_broker(broker).get_balance(ticker)}
-
 
 # ── 시세 ─────────────────────────────────────────────────────────────
 @app.get("/api/current_price")
 def get_current_price(broker: str = Query(...), ticker: str = Query(...), x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return {"price": _get_broker(broker).get_current_price(ticker)}
-
 
 @app.get("/api/ohlcv")
 def get_ohlcv(broker: str = Query(...), ticker: str = Query(...),
@@ -121,14 +111,12 @@ def get_ohlcv(broker: str = Query(...), ticker: str = Query(...),
             df_reset[col] = df_reset[col].astype(str)
     return {"data": df_reset.to_dict(orient="records"), "columns": list(df_reset.columns), "index_name": df.index.name}
 
-
 # ── 주문 조회 ────────────────────────────────────────────────────────
 @app.get("/api/orders")
 def get_orders(broker: str = Query(...), ticker: str = Query(...),
                state: str = Query("wait"), x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return _get_broker(broker).get_order(ticker, state=state)
-
 
 # ── 주문 실행 ────────────────────────────────────────────────────────
 class OrderRequest(BaseModel):
@@ -137,7 +125,6 @@ class OrderRequest(BaseModel):
     price: float = 0
     volume: float = 0
     virtual: bool = False  # True → 체결 안 되는 가격으로 변환
-
 
 def _apply_virtual_price(broker, ticker, side, price, virtual):
     """가상 모드: 매수 *0.5, 매도 *1.5 → 체결 불가능한 가격으로 변환"""
@@ -153,7 +140,6 @@ def _apply_virtual_price(broker, ticker, side, price, virtual):
     else:
         return round_price_upbit(cur * 1.5)
 
-
 @app.post("/api/buy_market")
 def buy_market(req: OrderRequest, x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
@@ -167,7 +153,6 @@ def buy_market(req: OrderRequest, x_api_key: str = Header(default="")):
         return {"result": b.buy_limit_order(req.ticker, vp, qty), "virtual": True}
     return {"result": b.buy_market_order(req.ticker, req.price)}
 
-
 @app.post("/api/sell_market")
 def sell_market(req: OrderRequest, x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
@@ -177,7 +162,6 @@ def sell_market(req: OrderRequest, x_api_key: str = Header(default="")):
         logger.info(f"[VIRTUAL] sell_limit {req.ticker} @ {vp:.0f} qty: {req.volume}")
         return {"result": b.sell_limit_order(req.ticker, vp, req.volume), "virtual": True}
     return {"result": b.sell_market_order(req.ticker, req.volume)}
-
 
 @app.post("/api/buy_limit")
 def buy_limit(req: OrderRequest, x_api_key: str = Header(default="")):
@@ -189,7 +173,6 @@ def buy_limit(req: OrderRequest, x_api_key: str = Header(default="")):
         logger.info(f"[VIRTUAL] buy_limit {req.ticker} @ {price:.0f} (orig: {req.price:.0f}) qty: {req.volume}")
     return {"result": b.buy_limit_order(req.ticker, price, req.volume), "virtual": req.virtual}
 
-
 @app.post("/api/sell_limit")
 def sell_limit(req: OrderRequest, x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
@@ -200,12 +183,10 @@ def sell_limit(req: OrderRequest, x_api_key: str = Header(default="")):
         logger.info(f"[VIRTUAL] sell_limit {req.ticker} @ {price:.0f} (orig: {req.price:.0f}) qty: {req.volume}")
     return {"result": b.sell_limit_order(req.ticker, price, req.volume), "virtual": req.virtual}
 
-
 @app.post("/api/cancel_order")
 def cancel_order(broker: str = Query(...), uuid: str = Query(...), x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return {"result": _get_broker(broker).cancel_order(uuid)}
-
 
 # ── 개별 주문 상태 조회 ──────────────────────────────────────────────
 @app.get("/api/order_detail")
@@ -216,7 +197,6 @@ def order_detail(broker: str = Query(...), uuid: str = Query(...), x_api_key: st
         return {"result": b.upbit.get_order(uuid)}
     return {"result": None}
 
-
 # ── 입출금 내역 ──────────────────────────────────────────────────────
 @app.get("/api/deposits")
 def get_deposits(broker: str = Query(...), currency: str = Query("KRW"),
@@ -225,7 +205,6 @@ def get_deposits(broker: str = Query(...), currency: str = Query("KRW"),
     b = _get_broker(broker)
     return b.get_deposit_history(currency, count) if hasattr(b, 'get_deposit_history') else []
 
-
 @app.get("/api/withdraws")
 def get_withdraws(broker: str = Query(...), currency: str = Query("KRW"),
                   count: int = Query(20), x_api_key: str = Header(default="")):
@@ -233,14 +212,34 @@ def get_withdraws(broker: str = Query(...), currency: str = Query("KRW"),
     b = _get_broker(broker)
     return b.get_withdraw_history(currency, count) if hasattr(b, 'get_withdraw_history') else []
 
-
-# ══════════════════════════════════════════════════════════════════════
-# 스케줄러 — 예약 주문 (백그라운드)
-# ══════════════════════════════════════════════════════════════════════
-_scheduled_orders = []  # {"id", "broker", "ticker", "side", "price", "volume", "trigger_time", "status"}
+# ── 스케줄러 — 예약 주문 (백그라운드) ──
 _schedule_lock = threading.Lock()
-_next_id = 1
+_RESERVE_FILE = os.path.join(os.path.dirname(__file__), "cache", "reserve_orders.json")
 
+def _load_reserve_orders():
+    """파일에서 예약주문 로드 (VM 재시작 시 복원)."""
+    try:
+        if os.path.exists(_RESERVE_FILE):
+            with open(_RESERVE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data
+    except Exception as e:
+        logger.warning(f"예약주문 로드 실패: {e}")
+    return []
+
+def _save_reserve_orders():
+    """예약주문 목록을 파일에 저장."""
+    try:
+        tmp = _RESERVE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_scheduled_orders, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, _RESERVE_FILE)
+    except Exception as e:
+        logger.error(f"예약주문 저장 실패: {e}")
+
+_scheduled_orders = _load_reserve_orders()
+_next_id = max((o.get("id", 0) for o in _scheduled_orders), default=0) + 1
 
 class ScheduleRequest(BaseModel):
     broker: str
@@ -250,7 +249,6 @@ class ScheduleRequest(BaseModel):
     price: float = 0
     volume: float = 0
     trigger_time: str  # ISO format "2026-03-21T15:30:00"
-
 
 @app.post("/api/schedule/add")
 def schedule_add(req: ScheduleRequest, x_api_key: str = Header(default="")):
@@ -272,15 +270,14 @@ def schedule_add(req: ScheduleRequest, x_api_key: str = Header(default="")):
         }
         _scheduled_orders.append(order)
         _next_id += 1
+        _save_reserve_orders()
         logger.info(f"Schedule added: #{order['id']} {req.side} {req.ticker} at {req.trigger_time}")
         return order
-
 
 @app.get("/api/schedule/list")
 def schedule_list(x_api_key: str = Header(default="")):
     _check_auth(x_api_key)
     return _scheduled_orders
-
 
 @app.delete("/api/schedule/cancel")
 def schedule_cancel(order_id: int = Query(...), x_api_key: str = Header(default="")):
@@ -289,13 +286,11 @@ def schedule_cancel(order_id: int = Query(...), x_api_key: str = Header(default=
         for order in _scheduled_orders:
             if order["id"] == order_id and order["status"] == "waiting":
                 order["status"] = "cancelled"
+                _save_reserve_orders()
                 return {"result": "cancelled", "id": order_id}
     raise HTTPException(404, f"Order #{order_id} not found or not cancellable")
 
-
-# ══════════════════════════════════════════════════════════════════════
-# 확장 스케줄러 — 예약주문 + 잔고동기화 + GitHub push + 하트비트
-# ══════════════════════════════════════════════════════════════════════
+# ── 확장 스케줄러 ──
 
 from cache_utils import (
     save_balance_cache, save_signal_state, save_scheduler_state,
@@ -320,11 +315,12 @@ def _now_kst():
 
 _scheduler_state = {"__started_at_kst": _now_kst().strftime("%Y-%m-%d %H:%M:%S")}
 
-
 def _sync_balance():
     """잔고 + 현재 보유 종목 시세 동기화 → cache/balance_cache.json"""
     try:
         for broker_key, broker in _brokers.items():
+            if broker_key.startswith("kis") and not hasattr(broker, '_sync_ok'):
+                continue  # KIS 미설정 시 스킵
             balances = broker.get_balances()
             if not isinstance(balances, list):
                 continue
@@ -353,7 +349,6 @@ def _sync_balance():
         logger.error(f"Balance sync error: {e}")
         record_scheduler_error(_scheduler_state, "balance_sync", e)
 
-
 def _push_to_github():
     """캐시 파일을 GitHub에 push"""
     if not GH_PAT:
@@ -362,7 +357,6 @@ def _push_to_github():
         push_all_cache(GH_PAT)
     except Exception as e:
         logger.error(f"GitHub push error: {e}")
-
 
 def _run_strategy():
     """전략 자동 실행 — strategy_engine 호출."""
@@ -389,14 +383,12 @@ def _run_strategy():
         if fails >= 3:
             _self_heal(fails)
 
-
 def _self_heal(consecutive_failures: int):
     """연속 실패 시 자가 복구 → cache_utils.self_heal_reset 호출."""
     from cache_utils import self_heal_reset
     self_heal_reset(consecutive_failures)
     _scheduler_state["__consecutive_failures"] = "0"
     save_scheduler_state(_scheduler_state)
-
 
 def _scheduler_loop():
     """통합 스케줄러 — 전략실행 + 예약주문 + 잔고동기화 + GitHub push + 하트비트"""
@@ -458,6 +450,7 @@ def _scheduler_loop():
                         order["status"] = "executed"
                         order["result"] = str(result)
                         order["executed_at"] = now.isoformat()
+                        _save_reserve_orders()
                         logger.info(f"Schedule executed: #{order['id']} {order['side']} {order['ticker']} -> {result}")
 
                         append_trade_log({
@@ -472,17 +465,16 @@ def _scheduler_loop():
                 except Exception as e:
                     order["status"] = "error"
                     order["result"] = str(e)
+                    _save_reserve_orders()
                     logger.error(f"Schedule error: #{order['id']} {e}")
                     record_scheduler_error(_scheduler_state, "schedule", e)
 
         _time.sleep(10)
 
-
 # 스케줄러 스레드 시작
 _scheduler_thread = threading.Thread(target=_scheduler_loop, daemon=True)
 _scheduler_thread.start()
 logger.info("Scheduler thread started (balance sync + GitHub push + heartbeat)")
-
 
 if __name__ == "__main__":
     import uvicorn

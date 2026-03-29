@@ -175,6 +175,7 @@ CACHE_FILES = [
     "cache/trade_log.json",
     "cache/scheduler_state.json",
     "cache/execution_log.json",
+    "cache/reserve_orders.json",
 ]
 
 
