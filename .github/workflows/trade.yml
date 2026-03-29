@@ -1,0 +1,97 @@
+name: "Auto Trade (Backup Trigger)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "실행할 작업"
+        required: true
+        type: choice
+        default: trade
+        options:
+          - trade
+          - restart_server
+          - health_check
+
+permissions:
+  contents: write
+
+jobs:
+  trade:
+    if: github.event.inputs.action == 'trade'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Run Auto Trade via VM SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            cd ~/Upbit-practice
+            # 상태 파일 백업
+            for f in signal_state.json balance_cache.json trade_log.json execution_log.json portfolio.json reserve_orders.json; do
+              cp cache/$f /tmp/_backup_$f 2>/dev/null || true
+            done
+            # 코드 업데이트
+            git fetch origin --quiet && git reset --hard origin/main --quiet 2>/dev/null || true
+            # 상태 파일 복원
+            for f in signal_state.json balance_cache.json trade_log.json execution_log.json portfolio.json reserve_orders.json; do
+              cp /tmp/_backup_$f cache/$f 2>/dev/null || true
+            done
+            # 전략 실행
+            source venv/bin/activate
+            python -c "
+            from dotenv import load_dotenv; load_dotenv()
+            from broker_upbit import BrokerUpbit
+            from strategy_engine import run_strategy, load_portfolio
+            import os
+            b = BrokerUpbit(os.getenv('UPBIT_ACCESS_KEY'), os.getenv('UPBIT_SECRET_KEY'))
+            results = run_strategy(b, load_portfolio())
+            print(f'Results: {len(results)} orders')
+            "
+
+      - name: Sync results to GitHub
+        run: |
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/Upbit-practice/cache/balance_cache.json cache/ 2>/dev/null || true
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/Upbit-practice/cache/signal_state.json cache/ 2>/dev/null || true
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/Upbit-practice/cache/trade_log.json cache/ 2>/dev/null || true
+          git config user.name "auto-trade-bot"
+          git config user.email "bot@auto-trade"
+          git add cache/ && git diff --cached --quiet || git commit -m "sync cache from VM" && git push
+
+  restart:
+    if: github.event.inputs.action == 'restart_server'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart API Server on VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd ~/Upbit-practice
+            git fetch origin --quiet && git reset --hard origin/main --quiet 2>/dev/null || true
+            source venv/bin/activate
+            pkill -f "uvicorn api_server" 2>/dev/null || true
+            sleep 2
+            nohup python -m uvicorn api_server:app --host 0.0.0.0 --port 8000 > /tmp/api_server.log 2>&1 &
+            sleep 3
+            curl -s http://localhost:8000/api/health
+
+  health:
+    if: github.event.inputs.action == 'health_check'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check VM Health
+        run: |
+          result=$(curl -s -m 10 -H "X-API-Key: ${{ secrets.VM_API_KEY }}" "http://${{ secrets.VM_HOST }}:8000/api/health" 2>&1)
+          echo "Health: $result"
+          echo "$result" | grep -q '"status":"ok"' || exit 1
