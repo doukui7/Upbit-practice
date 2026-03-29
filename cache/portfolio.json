@@ -1,0 +1,10 @@
+[
+  {
+    "ticker": "KRW-BTC",
+    "strategy": "Donchian",
+    "param": 115,
+    "sell_param": 105,
+    "interval": "minute240",
+    "weight": 100
+  }
+]
