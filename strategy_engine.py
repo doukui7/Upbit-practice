@@ -15,10 +15,29 @@ from cache_utils import (
     load_signal_state, save_signal_state,
     append_trade_log, append_execution_log,
 )
+from notifier import send_telegram
 
 logger = logging.getLogger(__name__)
 
 MIN_ORDER_KRW = 5000
+_DEFAULT_PORTFOLIO = [
+    {"ticker": "KRW-BTC", "strategy": "Donchian", "param": 115,
+     "sell_param": 105, "interval": "minute240", "weight": 100},
+]
+
+
+def load_portfolio():
+    """cache/portfolio.json에서 포트폴리오 설정 로드."""
+    import json
+    from pathlib import Path
+    p = Path(__file__).parent / "cache" / "portfolio.json"
+    if p.exists():
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"portfolio.json 로드 실패: {e}")
+    return list(_DEFAULT_PORTFOLIO)
 
 try:
     from zoneinfo import ZoneInfo
@@ -314,5 +333,15 @@ def run_strategy(broker, portfolio: list[dict], dry_run: bool = False):
         "buys": sum(1 for r in results if r["side"] == "BUY"),
         "portfolio": [a["ticker"] for a in analyses],
     })
+
+    # ── 텔레그램 알림 ──
+    if results:
+        lines = [f"<b>자동매매 실행</b> ({now.strftime('%H:%M')})"]
+        for r in results:
+            lines.append(f"  {r['side']} {r['ticker']}: {str(r['result'])[:100]}")
+        try:
+            send_telegram("\n".join(lines))
+        except Exception:
+            pass
 
     return results

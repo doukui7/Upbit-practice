@@ -205,6 +205,45 @@ def sync_cache_from_github(force=False):
         return False
 
 
+def self_heal_reset(consecutive_failures: int):
+    """연속 실패 시 자가 복구 (D:\\upbit 패턴).
+    상태 파일 백업 → git reset → 상태 복원."""
+    import shutil
+    import subprocess
+
+    logger.warning(f"자가복구 발동: 연속 {consecutive_failures}회 실패")
+
+    backup_dir = Path("/tmp/_trade_backup")
+    backup_dir.mkdir(exist_ok=True)
+
+    preserve = ["signal_state.json", "balance_cache.json", "trade_log.json",
+                 "execution_log.json", "portfolio.json"]
+    for fname in preserve:
+        src = CACHE_DIR / fname
+        if src.exists():
+            shutil.copy2(str(src), str(backup_dir / fname))
+
+    try:
+        subprocess.run(["git", "fetch", "origin"], cwd=str(PROJECT_DIR),
+                        timeout=30, capture_output=True)
+        subprocess.run(["git", "reset", "--hard", "origin/main"],
+                        cwd=str(PROJECT_DIR), timeout=30, capture_output=True)
+        logger.info("git reset --hard origin/main 완료")
+    except Exception as e:
+        logger.error(f"git reset 실패: {e}")
+
+    for fname in preserve:
+        bk = backup_dir / fname
+        if bk.exists():
+            shutil.copy2(str(bk), str(CACHE_DIR / fname))
+
+    try:
+        from notifier import send_telegram
+        send_telegram(f"<b>자가복구 완료</b>\n연속 {consecutive_failures}회 실패 후 git reset 실행")
+    except Exception:
+        pass
+
+
 def push_file_via_api(gh_pat, filepath, commit_msg="auto-update cache"):
     """GitHub Contents API로 단일 파일 push (VM용, D:\\upbit 패턴 재사용)"""
     import urllib.request

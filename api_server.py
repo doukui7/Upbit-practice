@@ -364,31 +364,13 @@ def _push_to_github():
         logger.error(f"GitHub push error: {e}")
 
 
-def _load_portfolio():
-    """cache/portfolio.json에서 포트폴리오 설정 로드."""
-    import json
-    from pathlib import Path
-    p = Path(__file__).parent / "cache" / "portfolio.json"
-    if p.exists():
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.warning(f"portfolio.json 로드 실패: {e}")
-    # 기본 포트폴리오 (BTC Donchian 115/105 4H)
-    return [
-        {"ticker": "KRW-BTC", "strategy": "Donchian", "param": 115,
-         "sell_param": 105, "interval": "minute240", "weight": 100},
-    ]
-
-
 def _run_strategy():
     """전략 자동 실행 — strategy_engine 호출."""
-    from strategy_engine import run_strategy, is_interval_due
+    from strategy_engine import run_strategy, is_interval_due, load_portfolio
     broker = _brokers.get("upbit")
     if not broker:
         return
-    portfolio = _load_portfolio()
+    portfolio = load_portfolio()
     # 주기 필터: 실행할 전략이 하나도 없으면 스킵
     now_kst = _now_kst()
     any_due = any(is_interval_due(item.get("interval", "day"), now_kst) for item in portfolio)
@@ -403,7 +385,17 @@ def _run_strategy():
             logger.info("전략 실행 완료: 주문 없음 (조건 미충족)")
     except Exception as e:
         logger.error(f"전략 실행 오류: {e}")
-        record_scheduler_error(_scheduler_state, "auto_trade", e)
+        fails = record_scheduler_error(_scheduler_state, "auto_trade", e)
+        if fails >= 3:
+            _self_heal(fails)
+
+
+def _self_heal(consecutive_failures: int):
+    """연속 실패 시 자가 복구 → cache_utils.self_heal_reset 호출."""
+    from cache_utils import self_heal_reset
+    self_heal_reset(consecutive_failures)
+    _scheduler_state["__consecutive_failures"] = "0"
+    save_scheduler_state(_scheduler_state)
 
 
 def _scheduler_loop():
